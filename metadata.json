@@ -1,0 +1,6 @@
+{
+  "name": "Bloom",
+  "description": "A frantic side-scrolling survival game where you must outrun a nuclear shockwave while deciding who to save along the way.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
