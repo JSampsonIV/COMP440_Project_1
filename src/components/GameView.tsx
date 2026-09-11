@@ -25,11 +25,12 @@ const INITIAL_NPCS: NPC[] = [
   { id: 3, x: 2400, progress: 0, saved: false, name: 'David', desc: 'A man pinned tightly beneath a collapsed steel beam.', skin: '#8d5524', shirt: '#8b0000', pants: '#1a1a1a' },
   { id: 4, x: 3200, progress: 0, saved: false, name: 'Sarah', desc: 'A teenager blinded by dust and debris, stumbling aimlessly.', skin: '#f1c27d', shirt: '#4682b4', pants: '#2c3e50' },
   { id: 5, x: 3800, progress: 0, saved: false, name: 'Marcus', desc: 'A father refusing to abandon his unconscious daughter.', skin: '#3d2b1f', shirt: '#2f4f4f', pants: '#4a4a4a' },
+  { id: 7, x: 100, progress: 0, saved: false, name: 'Blessing', desc: "Your girlfriend, who witnessed the explosion with you.", skin: '#5C3E2B', shirt: '#560E96', pants: '#2767E6'} //my gf made me add her
 ];
 
-const SKINS = ['#f1c27d', '#e0ac69', '#d2b48c', '#8d5524', '#3d2b1f'];
-const SHIRTS = ['#556b2f', '#4682b4', '#8b0000', '#2f4f4f', '#6b4226', '#3b3b3b'];
-const PANTS = ['#2c3e50', '#1a1a1a', '#4a4a4a', '#3e2723'];
+const SKINS = ['#f1c27d', '#e0ac69', '#d2b48c', '#8d5524', '#3d2b1f', '#ffdbac', '#c68642', '#e8beac'];
+const SHIRTS = ['#556b2f', '#4682b4', '#8b0000', '#2f4f4f', '#6b4226', '#3b3b3b', '#20504f', '#660000', '#191970', '#808000', '#cd5c5c', '#483d8b'];
+const PANTS = ['#2c3e50', '#1a1a1a', '#4a4a4a', '#3e2723', '#2f4f4f', '#191919', '#696969', '#556b2f'];
 
 export default function GameView({ onEnd }: { onEnd: (result: GameResult) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -204,12 +205,15 @@ export default function GameView({ onEnd }: { onEnd: (result: GameResult) => voi
       ctx.restore();
     };
 
-    const drawGrittyHouse = (ctx: CanvasRenderingContext2D, x: number, y: number, width: number, isDamaged: boolean) => {
+    const drawGrittyHouse = (ctx: CanvasRenderingContext2D, x: number, y: number, width: number, isDamaged: boolean, colorIndex: number) => {
       ctx.save();
       ctx.translate(x, y);
 
+      const houseColors = ['#4a4238', '#5c6b73', '#6a3b35', '#4a5043', '#554433'];
+      const houseColor = houseColors[colorIndex % houseColors.length];
+
       // Main structure
-      ctx.fillStyle = '#4a4238';
+      ctx.fillStyle = houseColor;
       ctx.fillRect(0, -160, width, 160);
       
       // Siding lines
@@ -376,36 +380,49 @@ export default function GameView({ onEnd }: { onEnd: (result: GameResult) => voi
             }
           }
         });
+
+        const timeRatio = state.timeElapsed / TOTAL_TIME;
       }
 
       // Drawing
       const width = canvas.width;
       const height = canvas.height;
 
-      // Base background (dark brownish sky)
-      ctx.fillStyle = '#3a3229';
-      ctx.fillRect(0, 0, width, height);
-
       const timeRatio = state.timeElapsed / TOTAL_TIME;
+      const shakeMag = Math.pow(timeRatio, 4) * 40; 
+      const shakeX = (Math.random() - 0.5) * shakeMag;
+      const shakeY = (Math.random() - 0.5) * shakeMag;
+
+      ctx.save();
+      ctx.translate(shakeX, shakeY);
+
+      // Base background (apocalyptic sky)
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
+      skyGrad.addColorStop(0, '#1a1016'); // dark purple/black
+      skyGrad.addColorStop(0.5, '#4a2511'); // burnt reddish brown
+      skyGrad.addColorStop(1, '#8c3b22'); // dirty orange at horizon
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(-50, -50, width + 100, height + 100);
       
       // Mushroom Cloud Explosion
       ctx.save();
-      const cloudScale = (timeRatio * timeRatio * 6) + 0.1;
+      // Start with a large visible cloud at scale 1.0, and grow slightly
+      const cloudScale = 1.0 + (timeRatio * 1.8);
       const centerX = width / 2;
       const groundLevel = height - 80;
       
       ctx.translate(centerX, groundLevel);
       ctx.scale(cloudScale, cloudScale);
 
-      // Dust ring kicking up
+      // Dust ring (Base Surge)
       ctx.save();
-      const dustRadius = 300 + (timeRatio * 500);
+      const dustRadius = 400 + (timeRatio * 400);
       ctx.scale(1, 0.15); 
       const dustGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, dustRadius);
-      dustGrad.addColorStop(0, 'rgba(255, 146, 18, 1)');
-      dustGrad.addColorStop(0.3, 'rgba(153, 126, 103, 0.9)');
-      dustGrad.addColorStop(0.7, 'rgba(97, 85, 71, 0.8)');
-      dustGrad.addColorStop(1, 'rgba(97, 85, 71, 0)');
+      dustGrad.addColorStop(0, 'rgba(255, 120, 0, 0.9)');
+      dustGrad.addColorStop(0.2, 'rgba(120, 90, 70, 0.9)');
+      dustGrad.addColorStop(0.6, 'rgba(60, 50, 45, 0.8)');
+      dustGrad.addColorStop(1, 'rgba(40, 30, 25, 0)');
       ctx.fillStyle = dustGrad;
       ctx.beginPath();
       ctx.arc(0, 0, dustRadius, 0, Math.PI * 2);
@@ -413,55 +430,45 @@ export default function GameView({ onEnd }: { onEnd: (result: GameResult) => voi
       ctx.restore();
 
       // Cloud stem
-      const stemGrad = ctx.createLinearGradient(-40, 0, 40, 0);
-      stemGrad.addColorStop(0, '#3a3229');
-      stemGrad.addColorStop(0.5, '#FF9212');
-      stemGrad.addColorStop(1, '#3a3229');
+      const stemGrad = ctx.createLinearGradient(-60, 0, 60, 0);
+      stemGrad.addColorStop(0, '#111');
+      stemGrad.addColorStop(0.15, '#333');
+      stemGrad.addColorStop(0.5, '#ffa500'); // fiery core
+      stemGrad.addColorStop(0.85, '#333');
+      stemGrad.addColorStop(1, '#111');
       ctx.fillStyle = stemGrad;
       ctx.beginPath();
-      ctx.moveTo(-30, 0);
-      ctx.quadraticCurveTo(-20, -150, -50, -250);
-      ctx.lineTo(50, -250);
-      ctx.quadraticCurveTo(20, -150, 30, 0);
+      ctx.moveTo(-50, 0);
+      ctx.bezierCurveTo(-30, -150, -20, -300, -80, -450);
+      ctx.lineTo(80, -450);
+      ctx.bezierCurveTo(20, -300, 30, -150, 50, 0);
       ctx.fill();
 
-      // Cloud cap
-      const capGrad = ctx.createRadialGradient(0, -220, 10, 0, -220, 160);
-      capGrad.addColorStop(0, '#FFFEA1');
-      capGrad.addColorStop(0.3, '#FF9212');
-      capGrad.addColorStop(0.7, '#615547');
-      capGrad.addColorStop(1, 'rgba(58, 50, 41, 0)');
-      ctx.fillStyle = capGrad;
-
-      ctx.beginPath();
-      ctx.arc(0, -250, 150, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Side plumes
-      ctx.beginPath();
-      ctx.arc(-80, -220, 110, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(80, -220, 110, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Debris/Dust kicks on the ground
-      ctx.fillStyle = 'rgba(97, 85, 71, 0.8)';
-      for(let i=0; i<7; i++) {
-          const ang = (i / 6) * Math.PI;
-          const dx = Math.cos(ang + Math.PI) * 200;
-          const dy = Math.sin(ang + Math.PI) * 50 - 20;
+      // Cauliflower Cap function
+      const drawPuff = (px: number, py: number, pr: number, innerColor: string, outerColor: string) => {
+          const grad = ctx.createRadialGradient(px, py, 0, px, py, pr);
+          grad.addColorStop(0, innerColor);
+          grad.addColorStop(0.7, outerColor);
+          grad.addColorStop(1, 'rgba(20, 20, 20, 0)');
+          ctx.fillStyle = grad;
           ctx.beginPath();
-          ctx.arc(dx, dy, 70, 0, Math.PI * 2);
+          ctx.arc(px, py, pr, 0, Math.PI * 2);
           ctx.fill();
-      }
-      ctx.restore();
+      };
 
-      // Global explosion bloom overlay
-      ctx.save();
-      ctx.globalCompositeOperation = 'screen';
-      ctx.fillStyle = `rgba(255, 146, 18, ${timeRatio * timeRatio * 0.8})`;
-      ctx.fillRect(0, 0, width, height);
+      // Inner glowing core
+      drawPuff(0, -450, 180, '#ffffff', '#ff4500');
+      
+      // Outer dark ash puffs
+      drawPuff(0, -520, 160, '#ff4500', '#1a1a1a');
+      drawPuff(-100, -450, 140, '#ff6347', '#111111');
+      drawPuff(100, -450, 140, '#ff6347', '#111111');
+      drawPuff(-150, -380, 120, '#444444', '#0a0a0a');
+      drawPuff(150, -380, 120, '#444444', '#0a0a0a');
+      drawPuff(-70, -360, 130, '#883311', '#1a1a1a');
+      drawPuff(70, -360, 130, '#883311', '#1a1a1a');
+      drawPuff(0, -600, 140, '#555555', '#0a0a0a');
+
       ctx.restore();
 
       const cameraX = state.player.x - width / 3;
@@ -470,7 +477,7 @@ export default function GameView({ onEnd }: { onEnd: (result: GameResult) => voi
       ctx.translate(-cameraX, 0);
 
       // Distant background elements (mountains/hills)
-      ctx.fillStyle = '#2c2621';
+      ctx.fillStyle = '#1c1512';
       ctx.beginPath();
       ctx.moveTo(cameraX, groundLevel);
       for(let i=0; i<=width; i+=150) {
@@ -488,7 +495,7 @@ export default function GameView({ onEnd }: { onEnd: (result: GameResult) => voi
 
       // Scenery Houses
       for(let i=0; i<MAP_WIDTH; i+=500) {
-        drawGrittyHouse(ctx, i, groundLevel, 220, i % 3 === 0);
+        drawGrittyHouse(ctx, i, groundLevel, 220, i % 3 === 0, Math.floor(i / 500));
       }
 
       // Panic NPCs in the background
@@ -556,11 +563,21 @@ export default function GameView({ onEnd }: { onEnd: (result: GameResult) => voi
       });
 
       // Player
-      // Primary shades of brown (#997E67 light, #615547 dark)
+      // Using rugged survivor colors
       const playerRunPhase = state.player.isInteracting ? 0 : state.player.runDistance / 40;
-      drawGrittyPerson(ctx, state.player.x, groundLevel, '#f1c27d', '#997E67', '#615547', state.player.facingRight, playerRunPhase, true);
+      drawGrittyPerson(ctx, state.player.x, groundLevel, '#f1c27d', '#4a5d23', '#2a3b4c', state.player.facingRight, playerRunPhase, true);
       
+      ctx.restore(); // Restore camera translation
+
+      // Global explosion bloom overlay (Intensifies rapidly at the end)
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      const bloomIntensity = Math.min(1, Math.pow(timeRatio, 4) * 1.5 + (timeRatio * timeRatio * 0.8));
+      ctx.fillStyle = `rgba(255, 146, 18, ${bloomIntensity})`;
+      ctx.fillRect(-50, -50, width + 100, height + 100);
       ctx.restore();
+
+      ctx.restore(); // Restore shake translation
 
       // Heavy vignette for tension
       const vignetteAlpha = timeRatio * 0.85;
