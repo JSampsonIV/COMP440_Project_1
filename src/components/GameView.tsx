@@ -39,6 +39,7 @@ export default function GameView({ onEnd }: { onEnd: (result: GameResult) => voi
     timeElapsed: 0,
     player: { x: 200, isInteracting: false, facingRight: true, runDistance: 0 },
     npcs: JSON.parse(JSON.stringify(INITIAL_NPCS)) as NPC[],
+    savedNpcIds: [] as number[],
     shelterProgress: 0,
     isGameOver: false,
     gameWon: false,
@@ -103,106 +104,167 @@ export default function GameView({ onEnd }: { onEnd: (result: GameResult) => voi
       ctx.scale(facingRight ? 1 : -1, 1);
       
       const isMoving = runPhase > 0;
-      const bounce = isMoving ? Math.abs(Math.sin(runPhase * Math.PI)) * 4 : 0;
-      ctx.translate(0, -bounce);
-
-      const swing = isMoving ? Math.sin(runPhase * Math.PI * 2) * 20 : 0;
+      const cycle = runPhase * 0.8;
+      
+      const bounce = isMoving ? Math.abs(Math.sin(cycle * 2)) * 6 : 0;
+      ctx.translate(0, -bounce - 40); // Lift up so 0 is ground
+      
+      // Calculate joint angles (in radians)
+      const maxThigh = 0.8; 
+      const maxCalf = 1.0;
+      
+      const rightThigh = isMoving ? Math.sin(cycle) * maxThigh : 0.1;
+      const rightCalf = isMoving ? Math.max(0, Math.sin(cycle - Math.PI/2) * maxCalf) : 0.1;
+      
+      const leftThigh = isMoving ? Math.sin(cycle + Math.PI) * maxThigh : -0.1;
+      const leftCalf = isMoving ? Math.max(0, Math.sin(cycle + Math.PI - Math.PI/2) * maxCalf) : 0.1;
+      
+      const rightShoulder = isMoving ? Math.sin(cycle + Math.PI) * 0.8 : 0.1;
+      const rightElbow = isMoving ? -0.5 + Math.sin(cycle + Math.PI) * 0.3 : -0.2;
+      
+      const leftShoulder = isMoving ? Math.sin(cycle) * 0.8 : -0.1;
+      const leftElbow = isMoving ? -0.5 + Math.sin(cycle) * 0.3 : -0.2;
+      
+      const torsoTilt = isMoving ? 0.15 + Math.sin(cycle * 2) * 0.05 : 0.05;
       
       // Ground shadow
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.save();
+      ctx.translate(0, bounce + 40);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
       ctx.beginPath();
-      ctx.ellipse(0, bounce + 2, 16, 5, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, 18, 5, 0, 0, Math.PI * 2);
       ctx.fill();
-
-      // Back Arm
-      ctx.fillStyle = darken(shirt, 0.4);
-      ctx.save();
-      ctx.translate(0, -50);
-      ctx.rotate((swing * Math.PI) / 180);
-      ctx.fillRect(-4, 0, 8, 25);
-      ctx.fillStyle = darken(skin, 0.4);
-      ctx.fillRect(-3, 25, 6, 6);
       ctx.restore();
 
-      // Back Leg
-      ctx.fillStyle = darken(pants, 0.4);
+      const drawLimb = (w: number, h: number, color: string, shadeColor: string, isShoe = false) => {
+        // Fallback for roundRect if not perfectly supported, but modern browsers have it.
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(-w/2, 0, w, h, w/2);
+        } else {
+            ctx.rect(-w/2, 0, w, h);
+        }
+        ctx.fill();
+        ctx.fillStyle = shadeColor;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(-w/2, 0, w/3, h, w/2);
+        } else {
+            ctx.rect(-w/2, 0, w/3, h);
+        }
+        ctx.fill();
+        if (isShoe) {
+            ctx.fillStyle = '#111';
+            ctx.beginPath();
+            if (ctx.roundRect) ctx.roundRect(-w/2 - 2, h - 8, w + 6, 10, 4);
+            else ctx.rect(-w/2 - 2, h - 8, w + 6, 10);
+            ctx.fill();
+        }
+      };
+
+      // LEFT ARM (Back)
       ctx.save();
-      ctx.translate(0, -30);
-      ctx.rotate((-swing * Math.PI) / 180);
-      ctx.fillRect(-5, 0, 10, 32);
-      ctx.fillStyle = '#222'; // Shoe
-      ctx.fillRect(-6, 28, 14, 6);
+      ctx.translate(0, -18);
+      ctx.rotate(leftShoulder);
+      drawLimb(8, 16, darken(shirt, 0.2), darken(shirt, 0.4));
+      ctx.translate(0, 14);
+      ctx.rotate(leftElbow);
+      drawLimb(7, 16, darken(skin, 0.2), darken(skin, 0.4));
       ctx.restore();
 
-      // Torso
+      // LEFT LEG (Back)
+      ctx.save();
+      ctx.translate(0, 8);
+      ctx.rotate(leftThigh);
+      drawLimb(11, 20, darken(pants, 0.2), darken(pants, 0.4));
+      ctx.translate(0, 18);
+      ctx.rotate(leftCalf);
+      drawLimb(9, 20, darken(pants, 0.2), darken(pants, 0.4), true);
+      ctx.restore();
+
+      // TORSO
+      ctx.save();
+      ctx.rotate(torsoTilt);
       ctx.fillStyle = shirt;
       ctx.beginPath();
-      ctx.moveTo(-10, -55);
-      ctx.lineTo(8, -55);
-      ctx.lineTo(6, -25);
-      ctx.lineTo(-8, -25);
+      if (ctx.roundRect) ctx.roundRect(-10, -22, 20, 32, 6);
+      else ctx.rect(-10, -22, 20, 32);
       ctx.fill();
-      ctx.fillStyle = '#222'; // Belt
-      ctx.fillRect(-8, -28, 14, 4);
-      
-      // Shading on torso
       ctx.fillStyle = 'rgba(0,0,0,0.3)';
       ctx.beginPath();
-      ctx.moveTo(4, -55);
-      ctx.lineTo(8, -55);
-      ctx.lineTo(6, -25);
-      ctx.lineTo(2, -25);
+      if (ctx.roundRect) ctx.roundRect(-10, -22, 6, 32, 6);
+      else ctx.rect(-10, -22, 6, 32);
       ctx.fill();
-
-      // Front Leg
-      ctx.fillStyle = pants;
-      ctx.save();
-      ctx.translate(0, -30);
-      ctx.rotate((swing * Math.PI) / 180);
-      ctx.fillRect(-5, 0, 10, 32);
-      ctx.fillStyle = '#111'; // Shoe
-      ctx.fillRect(-5, 28, 14, 6);
-      ctx.fillStyle = 'rgba(0,0,0,0.3)'; // Leg shade
-      ctx.fillRect(-5, 0, 4, 32);
-      ctx.restore();
-
-      // Front Arm
-      ctx.fillStyle = shirt;
-      ctx.save();
-      ctx.translate(0, -50);
-      ctx.rotate((-swing * Math.PI) / 180);
-      ctx.fillRect(-4, 0, 8, 25);
-      ctx.fillStyle = 'rgba(0,0,0,0.3)'; // Arm shade
-      ctx.fillRect(-4, 0, 3, 25);
-      ctx.fillStyle = skin;
-      ctx.fillRect(-3, 25, 6, 6);
-      ctx.restore();
-
-      // Head
-      ctx.fillStyle = skin;
-      ctx.fillRect(-6, -72, 12, 16);
-      ctx.fillStyle = 'rgba(0,0,0,0.2)'; // Face shade
-      ctx.fillRect(-6, -72, 4, 16);
+      // Belt
+      ctx.fillStyle = '#222';
+      ctx.fillRect(-10, 6, 20, 5);
+      // Buckle
+      ctx.fillStyle = '#777';
+      ctx.fillRect(4, 5, 4, 7);
       
+      // HEAD
+      ctx.save();
+      ctx.translate(0, -24);
+      ctx.rotate(-torsoTilt + (isMoving ? Math.sin(cycle * 2) * 0.05 : 0)); // Keep head upright
+      ctx.fillStyle = skin;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(-8, -20, 16, 22, 6);
+      else ctx.rect(-8, -20, 16, 22);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(-8, -20, 5, 22, 6);
+      else ctx.rect(-8, -20, 5, 22);
+      ctx.fill();
       // Hair
       ctx.fillStyle = '#2c1e16';
-      ctx.fillRect(-7, -74, 14, 5);
-      ctx.fillRect(-7, -74, 5, 12);
-
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(-9, -22, 18, 8, 4);
+      else ctx.rect(-9, -22, 18, 8);
+      ctx.fill();
+      ctx.fillRect(-9, -16, 6, 12);
+      
       if (isPlayer) {
-        // High contrast accents for the player (sickly green and bright orange)
-        ctx.fillStyle = '#FF9212'; // Goggles
-        ctx.fillRect(-6, -69, 12, 4);
-        
-        ctx.fillStyle = '#52FC28'; // Arm device
-        ctx.save();
-        ctx.translate(0, -50);
-        ctx.rotate((-swing * Math.PI) / 180);
-        ctx.fillRect(-5, 8, 10, 6);
-        ctx.restore();
+          // Goggles
+          ctx.fillStyle = '#FF9212';
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(-4, -13, 14, 6, 2);
+          else ctx.rect(-4, -13, 14, 6);
+          ctx.fill();
+          // Goggle strap
+          ctx.fillStyle = '#111';
+          ctx.fillRect(-9, -12, 5, 4);
       }
+      ctx.restore(); // end head
+      ctx.restore(); // end torso
 
+      // RIGHT LEG (Front)
+      ctx.save();
+      ctx.translate(0, 8);
+      ctx.rotate(rightThigh);
+      drawLimb(12, 22, pants, darken(pants, 0.2));
+      ctx.translate(0, 20);
+      ctx.rotate(rightCalf);
+      drawLimb(10, 22, pants, darken(pants, 0.2), true);
       ctx.restore();
+
+      // RIGHT ARM (Front)
+      ctx.save();
+      ctx.translate(0, -18);
+      ctx.rotate(rightShoulder);
+      drawLimb(9, 18, shirt, darken(shirt, 0.2));
+      ctx.translate(0, 16);
+      ctx.rotate(rightElbow);
+      drawLimb(8, 18, skin, darken(skin, 0.2));
+      if (isPlayer) {
+          ctx.fillStyle = '#52FC28'; // Pip-boy style Arm device
+          ctx.fillRect(-5, 0, 10, 8);
+          ctx.fillStyle = '#111';
+          ctx.fillRect(-5, 2, 10, 4);
+      }
+      ctx.restore();
+      ctx.restore(); // Restore facing scale and translation
     };
 
     const drawGrittyHouse = (ctx: CanvasRenderingContext2D, x: number, y: number, width: number, isDamaged: boolean, colorIndex: number) => {
@@ -269,6 +331,17 @@ export default function GameView({ onEnd }: { onEnd: (result: GameResult) => voi
         ctx.lineTo(wx + 20, wy + 40);
         ctx.lineTo(wx + 10, wy + 40);
         ctx.fill();
+
+        if (isDamaged) {
+          ctx.fillStyle = '#3a2411';
+          ctx.save();
+          ctx.translate(wx + 18, wy + 23);
+          ctx.rotate(0.2);
+          ctx.fillRect(-22, -4, 44, 8);
+          ctx.rotate(-0.5);
+          ctx.fillRect(-22, -4, 44, 8);
+          ctx.restore();
+        }
       };
 
       drawWindow(80, -110);
@@ -325,6 +398,9 @@ export default function GameView({ onEnd }: { onEnd: (result: GameResult) => voi
           if (interactingWithNpc.progress >= 1) {
             interactingWithNpc.saved = true;
             interactingWithNpc.progress = 1;
+            if (!state.savedNpcIds.includes(interactingWithNpc.id)) {
+              state.savedNpcIds.push(interactingWithNpc.id);
+            }
           }
         } else {
             state.npcs.forEach(n => {
@@ -347,15 +423,21 @@ export default function GameView({ onEnd }: { onEnd: (result: GameResult) => voi
         }
 
         if (!state.player.isInteracting) {
+          let isMoving = false;
           if (keys.a) {
             state.player.x -= PLAYER_SPEED * dt;
             state.player.facingRight = false;
             state.player.runDistance += PLAYER_SPEED * dt;
+            isMoving = true;
           }
           if (keys.d) {
             state.player.x += PLAYER_SPEED * dt;
             state.player.facingRight = true;
             state.player.runDistance += PLAYER_SPEED * dt;
+            isMoving = true;
+          }
+          if (!isMoving) {
+            state.player.runDistance = 0; // Reset animation when stopped
           }
           if (state.player.x < 0) state.player.x = 0;
           if (state.player.x > MAP_WIDTH + 150) state.player.x = MAP_WIDTH + 150;
@@ -371,9 +453,11 @@ export default function GameView({ onEnd }: { onEnd: (result: GameResult) => voi
         });
 
         // Saved NPCs follow player
-        state.npcs.forEach((npc, index) => {
+        state.npcs.forEach((npc) => {
           if (npc.saved) {
-            const targetX = state.player.x - (state.player.facingRight ? 1 : -1) * (60 + index * 50);
+            const followIndex = state.savedNpcIds.indexOf(npc.id);
+            const orderIndex = followIndex !== -1 ? followIndex : 0;
+            const targetX = state.player.x - (state.player.facingRight ? 1 : -1) * (60 + orderIndex * 50);
             const dx = targetX - npc.x;
             if (Math.abs(dx) > 5) {
               npc.x += Math.sign(dx) * PLAYER_SPEED * 1.05 * dt; 
@@ -476,22 +560,56 @@ export default function GameView({ onEnd }: { onEnd: (result: GameResult) => voi
       ctx.save();
       ctx.translate(-cameraX, 0);
 
-      // Distant background elements (mountains/hills)
-      ctx.fillStyle = '#1c1512';
-      ctx.beginPath();
-      ctx.moveTo(cameraX, groundLevel);
-      for(let i=0; i<=width; i+=150) {
-        ctx.lineTo(cameraX + i, groundLevel - 100 - Math.sin(i * 0.01) * 50);
+      // Distant Ruined Cityscape (Parallax 0.3)
+      ctx.fillStyle = '#16100c';
+      const cityX = cameraX * 0.3;
+      for(let i = -1000; i < MAP_WIDTH + 2000; i += 120) {
+          if (i > cityX - 300 && i < cityX + width + 300) {
+              const h = 100 + Math.abs(Math.sin(i * 99)) * 250;
+              const w = 40 + Math.abs(Math.cos(i * 33)) * 80;
+              ctx.fillRect(i - cityX, groundLevel - h, w, h);
+              // Sparse illuminated windows
+              if (Math.sin(i) > 0.5) {
+                  ctx.fillStyle = 'rgba(255, 180, 50, 0.2)';
+                  ctx.fillRect(i - cityX + 10, groundLevel - h + 20, 4, 4);
+                  ctx.fillStyle = '#16100c';
+              }
+          }
       }
-      ctx.lineTo(cameraX + width, groundLevel);
+
+      // Distant background elements (mountains/hills - Parallax 0.5)
+      ctx.fillStyle = '#1c1512';
+      const hillX = cameraX * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(0, groundLevel);
+      for(let i = -200; i <= width + 200; i += 150) {
+        ctx.lineTo(i, groundLevel - 100 - Math.sin((i + hillX) * 0.01) * 50);
+      }
+      ctx.lineTo(width + 200, groundLevel);
       ctx.fill();
 
-      // Ground (Detailed)
+      // Ground (Detailed Wasteland)
       const groundGrad = ctx.createLinearGradient(0, groundLevel, 0, height);
-      groundGrad.addColorStop(0, '#4a3d31');
-      groundGrad.addColorStop(1, '#1f1a14');
+      groundGrad.addColorStop(0, '#3d3024');
+      groundGrad.addColorStop(1, '#15110d');
       ctx.fillStyle = groundGrad;
       ctx.fillRect(cameraX, groundLevel, width, height - groundLevel);
+
+      // Parallax cracked ground details
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+      ctx.lineWidth = 2;
+      const startX = Math.floor(cameraX / 100) * 100 - 100;
+      for (let i = startX; i < cameraX + width + 100; i += 100) {
+          const h1 = Math.abs(Math.sin(i * 12.3)) * (height - groundLevel - 20) + groundLevel;
+          const h2 = Math.abs(Math.cos(i * 4.5)) * (height - groundLevel - 20) + groundLevel;
+          ctx.beginPath();
+          ctx.moveTo(i, h1);
+          ctx.lineTo(i + 40, h2);
+          ctx.lineTo(i + 80, h1 + 10);
+          ctx.stroke();
+      }
+      ctx.restore();
 
       // Scenery Houses
       for(let i=0; i<MAP_WIDTH; i+=500) {
@@ -508,26 +626,44 @@ export default function GameView({ onEnd }: { onEnd: (result: GameResult) => voi
       ctx.fillStyle = '#1c1c1c';
       ctx.fillRect(SHELTER_X - 20, groundLevel - 240, 260, 240); // outer frame
       
-      ctx.fillStyle = '#2c2c2c';
+      ctx.fillStyle = '#2a2a2a';
       ctx.fillRect(SHELTER_X, groundLevel - 220, 220, 220); // inner block
 
-      ctx.fillStyle = '#4a4a4a'; // Vault door
+      // Heavy Vault Door (Gear shape)
+      ctx.fillStyle = '#4a4a4a';
       ctx.beginPath();
-      ctx.arc(SHELTER_X + 110, groundLevel - 110, 90, 0, Math.PI * 2);
+      ctx.arc(SHELTER_X + 110, groundLevel - 110, 95, 0, Math.PI * 2);
       ctx.fill();
       
-      ctx.fillStyle = '#333';
-      for (let i = 0; i < 8; i++) {
+      for(let i=0; i<12; i++) {
           ctx.save();
           ctx.translate(SHELTER_X + 110, groundLevel - 110);
-          ctx.rotate((i * Math.PI) / 4);
-          ctx.fillRect(-15, -100, 30, 20);
+          ctx.rotate(i * (Math.PI*2)/12);
+          ctx.fillStyle = '#4a4a4a';
+          ctx.fillRect(-12, -105, 24, 20);
           ctx.restore();
       }
+      
+      ctx.fillStyle = '#3a3a3a';
+      ctx.beginPath();
+      ctx.arc(SHELTER_X + 110, groundLevel - 110, 80, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = '#555';
+      ctx.beginPath();
+      ctx.arc(SHELTER_X + 110, groundLevel - 110, 70, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Vault numbering
+      ctx.fillStyle = '#e6c84c'; // classic yellow vault tint
+      ctx.font = 'bold 48px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('13', SHELTER_X + 110, groundLevel - 95);
+      ctx.textAlign = 'left';
 
-      ctx.fillStyle = '#52FC28'; // Green accent
+      ctx.fillStyle = '#e6c84c'; // classic yellow
       ctx.font = 'bold 36px monospace';
-      ctx.fillText('VAULT', SHELTER_X + 60, groundLevel - 260);
+      ctx.fillText('VAULT', SHELTER_X + 55, groundLevel - 260);
 
       if (Math.abs(SHELTER_X - state.player.x) < INTERACT_DISTANCE) {
         ctx.fillStyle = '#FFFEA1';
@@ -568,6 +704,15 @@ export default function GameView({ onEnd }: { onEnd: (result: GameResult) => voi
       drawGrittyPerson(ctx, state.player.x, groundLevel, '#f1c27d', '#4a5d23', '#2a3b4c', state.player.facingRight, playerRunPhase, true);
       
       ctx.restore(); // Restore camera translation
+
+      // Film Grain / Dirt Overlay
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      for(let i=0; i<400; i++) {
+          const rx = Math.random() * width;
+          const ry = Math.random() * height;
+          const rw = Math.random() * 2 + 1;
+          ctx.fillRect(rx, ry, rw, rw);
+      }
 
       // Global explosion bloom overlay (Intensifies rapidly at the end)
       ctx.save();

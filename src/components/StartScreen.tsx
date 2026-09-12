@@ -16,7 +16,7 @@ export default function StartScreen({ onStart }: { onStart: () => void }) {
           <h2 className="text-2xl font-bold mb-4 uppercase">Controls</h2>
           <ul className="space-y-2 font-bold text-lg">
             <li>[ A ] / [ D ] - Move Left / Right</li>
-            <li>[ E ] - Interact (Hold to Help / Enter Bunker)</li>
+            <li>[ E ] - Interact</li>
           </ul>
         </div>
         
